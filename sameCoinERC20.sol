@@ -235,7 +235,7 @@ contract Token is Initializable{
         balanceOf[_from] = balanceOf[_from].sub(_value);
         balanceOf[_to] = balanceOf[_to].add(_value);
         emit Transfer(_from, _to, _value);
-        assert(balanceOf[_from].add(balanceOf[_to]) == previousBalances);
+        //assert(balanceOf[_from].add(balanceOf[_to]) == previousBalances);
     }
 
     function transfer(address _to, uint _value) public {

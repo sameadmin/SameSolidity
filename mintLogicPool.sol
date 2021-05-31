@@ -346,12 +346,12 @@ contract Initializable {
     /**
      * @dev Indicates that the contract has been initialized.
      */
-    bool private initialized;
+    bool public initialized;
 
     /**
      * @dev Indicates that the contract is in the process of being initialized.
      */
-    bool private initializing;
+    bool public initializing;
 
     /**
      * @dev Modifier to use in the initializer function of a contract.
@@ -373,7 +373,7 @@ contract Initializable {
     }
 
     /// @dev Returns true if and only if the function is running in the constructor
-    function isConstructor() private view returns (bool) {
+    function isConstructor() public view returns (bool) {
         // extcodesize checks the size of the code stored in an address, and
         // address returns the current address. Since the code is still not
         // deployed when running a constructor, any checks on its code size will
@@ -391,11 +391,14 @@ contract Initializable {
 
 contract CEO {
     address public OwnerAddress;
+    address public WaitingAddress;
+    uint256 public CreateUpdataTime;
     constructor () internal {//建立合同需要运行的
         OwnerAddress = msg.sender;
-        //谁建立谁就是管理员帐号
+        WaitingAddress = msg.sender;
+        CreateUpdataTime = 0;
     }
-    modifier nolyCEO() { 
+    modifier onlyCEO() { 
         require (isCEO(),"You are not the CEO"); 
         _; 
     }
@@ -404,9 +407,17 @@ contract CEO {
         return OwnerAddress ==  msg.sender;
     }
 
-    function updataCEO (address CEOAddress) public nolyCEO{ //修改CEO地址
+    function updateCEOApply (address CEOAddress) public onlyCEO{ //提交更新CEO
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
-        OwnerAddress = CEOAddress;
+        WaitingAddress = CEOAddress;
+        CreateUpdataTime = now;
+    }
+
+    function updataConfirm () public  {//等24小时后，
+        require( now > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
+        require (WaitingAddress == msg.sender,'You are not to update the address');
+        OwnerAddress = WaitingAddress;
+        CreateUpdataTime = 0;
     }
 }
 
@@ -418,6 +429,8 @@ contract mintRewardLogic  is CEO,Initializable{
     address public implementation;
 
     address public massetAddress;
+
+    uint256 public CreateWithdrawTime = 0;
 
     //用户信息
     struct UserInfo {
@@ -438,6 +451,8 @@ contract mintRewardLogic  is CEO,Initializable{
     struct MintBlockIdInfo {
         uint256 totalMintAmt;
         uint256 lastRewardInterval;
+        uint256 nowdegree_;
+        bool noNull;
     }
 
     //用户信息 userInfo[addr]
@@ -450,9 +465,6 @@ contract mintRewardLogic  is CEO,Initializable{
     mapping (uint256 => mapping (address => uint256)) public totalPerMintAmt;
 
     address public sameCoinAddress;
-
-    //初始区块区间id
-    uint256 startBlockId;
 
     //奖励间隔 例如，15分钟间隔，因为以太每15秒更新一次区块，15分钟相当于60次更新
     uint256 public rewardInterval;
@@ -469,20 +481,29 @@ contract mintRewardLogic  is CEO,Initializable{
     //初始奖池资金量(SameCoin)
     uint256 public initialSameCoin = 0;
 
+    //上一次纪录被挖区块号ID
+    uint256 public lastMintBlockIntervalId = 0;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event show(uint256 val1,uint256 val2);
+    
 
     //创建时设置
     constructor () public {}
 
-    function initialize() public initializer{
-        startBlockId = block.number;
-        rewardInterval = 100;
-        degree = [28,22,20,15,10,5];
-        sameCoinPerBlock = [100000000000000000,80000000000000000,70000000000000000,60000000000000000,50000000000000000,40000000000000000];
+    function initialize(address sameCoinAddress_ , address massetAddress_) public initializer{
+        rewardInterval = 10;
+        degree = [50,50,0,0,0,0];
+        sameCoinPerBlock = [1000000000000000000,500000000000000000,0,0,0,0];
+        sameCoinAddress = sameCoinAddress_;
+        massetAddress = massetAddress_;
+        CreateWithdrawTime = 0;
+        lastMintBlockIntervalId = 0;
     }
 
-    function setMassetAddress (address addr) public nolyCEO{
+    /*function setMassetAddress (address addr) public onlyCEO{
         massetAddress = addr;
-    }
+    }*/
     
 
     modifier nolyLockingAddress() { 
@@ -507,6 +528,9 @@ contract mintRewardLogic  is CEO,Initializable{
         //当前发奖总额占初总奖池百分比
         uint256 awardProportion = totalAwards.mul(1e27).div(initialSameCoin);
         uint256 a = 0;
+        if(degreeLength==0){
+            return 0;
+        }
         for(uint256 i = 0; i<degreeLength;i++){
             a=a.add(degree[i]);
             uint256 ratio = a.mul(1e27).div(tolatDegree);
@@ -514,40 +538,61 @@ contract mintRewardLogic  is CEO,Initializable{
                 return i;
             }
         }
-        return 0;
-            
+        return degreeLength.sub(1);
     }
 
     //修改难度
-    function updataDegree (uint256 i ,uint256 val) public nolyCEO {
+    function updataDegree (uint256 i ,uint256 val) public onlyCEO {
+        require (i < degree.length , 'Is the index out of range' );
         degree[i] = val;
     }
     
 
     //设置sameCoinPerBlock
-    function updataSameCoinPerBlock (uint256 i ,uint256 val) public nolyCEO {
+    function updataSameCoinPerBlock (uint256 i ,uint256 val) public onlyCEO {
+        require (i < sameCoinPerBlock.length , 'Is the index out of range' );
         sameCoinPerBlock[i] = val;
     }
 
     //奖池充值
-    function bonusPoolRecharge (uint256 amt) public nolyCEO  {
+    function bonusPoolRecharge (uint256 amt) public onlyCEO  {
         //增加初开始值
         initialSameCoin = initialSameCoin.add(amt);
         //转SameCoin到奖金池
         IERC20(sameCoinAddress).safeTransferFrom(address(msg.sender), address(this), amt);
+        emit Transfer(address(msg.sender), address(this), amt);
+    }
+    
+    //CEO往奖池提款申请
+    function bonusPoolWithdrawApply () public onlyCEO  {
+        CreateWithdrawTime = now;
     }
 
+    //CEO往奖池提款申请确认
+    function bonusPoolWithdrawConfirm (uint256 amt) public onlyCEO {
+        
+        require( now > CreateWithdrawTime + (60*60) && CreateWithdrawTime!=0, "Time has not expired");//1小时
+
+        CreateWithdrawTime = 0;
+
+        uint256 sameCoinSupply = IERC20(sameCoinAddress).balanceOf(address(this));
+        require (sameCoinSupply >= amt,"Amt no good");
+        //增加初始值
+        initialSameCoin = initialSameCoin.sub(amt);
+        IERC20(sameCoinAddress).safeTransfer(address(msg.sender),amt);
+        emit Transfer(address(this),address(msg.sender),amt);
+
+    }
     //设置SameCoinERC20 地址
-    function set_SameCoinERC20(address addr) public nolyCEO {
+   /* function set_SameCoinERC20(address addr) public onlyCEO {
         sameCoinAddress = addr;
-    }
-
+    }*/
+    
     //设置奖励间隔rewardInterval
-    function updataRewardInterval (uint256 val) public nolyCEO {
+    function updataRewardInterval (uint256 val) public onlyCEO {
         rewardInterval = val;
     }
-
-
+    
     //function查看当前区块区间id
     function nowBlockId () public view returns(uint256){
         return block.number.div(rewardInterval);
@@ -587,7 +632,8 @@ contract mintRewardLogic  is CEO,Initializable{
         if(!BlockIdDiff(addr)){
             return 0;
         }
-        uint256 nowdegree_ = nowdegree();
+        //uint256 nowdegree_ = nowdegree();
+        uint256 nowdegree_ = mintBlockIdInfo[lastBlockIntervalId_].nowdegree_;
         uint256 a = sameCoinPerBlock[nowdegree_].mul(1e27).div(totalMintAmt_);
         return totalPerMintAmt_.mul(a).div(1e27);
     }
@@ -608,14 +654,30 @@ contract mintRewardLogic  is CEO,Initializable{
         }
     }
     
+    //更新以挖总数量
+    function updateTotalAwards () public returns(uint256) {
+        if(lastMintBlockIntervalId != nowBlockId()){
+            lastMintBlockIntervalId = nowBlockId();
+            //累积当前每个块发放奖励
+            totalAwards = totalAwards.add(sameCoinPerBlock[nowdegree()]);
+            if(totalAwards>initialSameCoin){
+                totalAwards = initialSameCoin;
+            }
+        }
+        return totalAwards;
+    }
 
     
     //个人结算 settle
     function settle (address addr) public {
         UserInfo storage user = userInfo[addr];
         uint256 pendingSameCoin_ = pendingSameCoin(addr);
-        // totalAwards = totalAwards - 减去原来 + 新的部分
-        totalAwards = totalAwards.add(pendingSameCoin_).sub(user.pendingSameCoin);
+        //更新以挖总数量
+        uint256 oldTotalAwards = totalAwards;
+        if(oldTotalAwards>initialSameCoin){
+            uint256 pendingSameCoin_ = initialSameCoin.sub(oldTotalAwards);
+        }
+        totalAwards = updateTotalAwards();
         user.pendingSameCoin = pendingSameCoin_;
         uint256 nowBlockId_ = nowBlockId();
         if(BlockIdDiff(addr)){
@@ -655,10 +717,13 @@ contract mintRewardLogic  is CEO,Initializable{
 
     //function兑换mint时，进行加净值
     function sameUSDToMint(address addr,uint256 amt) public nolyLockingAddress{
-        settle(addr);
         uint256 nowBlockId_ = nowBlockId();
+        mintBlockIdInfo[nowBlockId_].nowdegree_ = nowdegree();
+        mintBlockIdInfo[nowBlockId_].noNull = true;
+        settle(addr);
         totalPerMintAmt[nowBlockId_][addr] = totalPerMintAmt[nowBlockId_][addr].add(amt);
         mintBlockIdInfo[nowBlockId_].totalMintAmt = mintBlockIdInfo[nowBlockId_].totalMintAmt.add(amt);
+        
     }
     
 
@@ -669,13 +734,33 @@ contract mintRewardLogic  is CEO,Initializable{
         if(totalPerMintAmt[nowBlockId_][addr]<amt){
             amt = totalPerMintAmt[nowBlockId_][addr];
         }
-        if(mintBlockIdInfo[nowBlockId_].totalMintAmt<amt){
+        /*if(mintBlockIdInfo[nowBlockId_].totalMintAmt<amt){
             amt = mintBlockIdInfo[nowBlockId_].totalMintAmt;
-        }
+        }*/
         totalPerMintAmt[nowBlockId_][addr] = totalPerMintAmt[nowBlockId_][addr].sub(amt);
         mintBlockIdInfo[nowBlockId_].totalMintAmt = mintBlockIdInfo[nowBlockId_].totalMintAmt.sub(amt);
-
+        //检查赎回后，是否还有人在挖，没人挖的话扣回累积挖矿数量
+        if(lastMintBlockIntervalId == nowBlockId_ && mintBlockIdInfo[nowBlockId_].totalMintAmt == 0 && mintBlockIdInfo[nowBlockId_].noNull){
+            uint256 nowdegree_ = mintBlockIdInfo[nowBlockId_].nowdegree_;
+            totalAwards = totalAwards.sub(sameCoinPerBlock[nowdegree_]);
+        }
     }
+    //uint256 nowdegree_ = mintBlockIdInfo[nowBlockId_].nowdegree_;
+
+    /*function sameUSDToRredeem (address addr,uint256 amt) public nolyLockingAddress{
+        settle(addr);
+        uint256 nowBlockId_ = nowBlockId();
+        if(totalPerMintAmt[nowBlockId_][addr]<amt){
+            amt = totalPerMintAmt[nowBlockId_][addr];
+        }
+        
+        totalPerMintAmt[nowBlockId_][addr] = totalPerMintAmt[nowBlockId_][addr].sub(amt);
+        mintBlockIdInfo[nowBlockId_].totalMintAmt = mintBlockIdInfo[nowBlockId_].totalMintAmt.sub(amt);
+        //检查赎回后，是否还有人在挖，没人挖的话扣回累积挖矿数量
+        if(lastMintBlockIntervalId == nowBlockId_ && mintBlockIdInfo[nowBlockId_].totalMintAmt == 0){
+            totalAwards = totalAwards.sub(sameCoinPerBlock[nowdegree()]);
+        }
+    }*/
 }
 
 

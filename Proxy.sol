@@ -14,30 +14,43 @@ pragma solidity ^0.8.0;
  */
   contract CEO {
     address public OwnerAddress;
-    constructor () {//建立合同需要运行的
+    address public WaitingAddress;
+    uint256 public CreateUpdataTime;
+    constructor ()  {//建立合同需要运行的
         OwnerAddress = msg.sender;
-        //谁建立谁就是管理员帐号
+        WaitingAddress = msg.sender;
+        CreateUpdataTime = 0;
     }
-    modifier nolyCEO() { 
+    modifier onlyCEO() { 
         require (isCEO(),"You are not the CEO"); 
         _; 
     }
-
+    
     function isCEO () public view returns (bool){
         return OwnerAddress ==  msg.sender;
     }
 
-    function updataCEO (address CEOAddress) public nolyCEO{ //修改CEO地址
+    function updateCEOApply (address CEOAddress) public onlyCEO{ //提交更新CEO
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
-        OwnerAddress = CEOAddress;
+        WaitingAddress = CEOAddress;
+        CreateUpdataTime = block.timestamp;
+    }
+
+    function updataConfirm () public  {//等24小时后，
+        require( block.timestamp > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
+        require (WaitingAddress == msg.sender,'You are not to update the address');
+        OwnerAddress = WaitingAddress;
+        CreateUpdataTime = 0;
     }
 }
+
+
 
 contract Proxy is CEO {
 
     address public implementation;
 
-    function upgradeTo(address _address) public nolyCEO{
+    function upgradeTo(address _address) public onlyCEO{
         implementation = _address;
     }
 

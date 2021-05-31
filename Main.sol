@@ -794,16 +794,16 @@ library StableMath {
 }
 
 contract Initializable {
-
+    //Initializable
     /**
      * @dev Indicates that the contract has been initialized.
      */
-    bool private initialized;
+    bool public initialized;
 
     /**
      * @dev Indicates that the contract is in the process of being initialized.
      */
-    bool private initializing;
+    bool public initializing;
 
     /**
      * @dev Modifier to use in the initializer function of a contract.
@@ -825,7 +825,7 @@ contract Initializable {
     }
 
     /// @dev Returns true if and only if the function is running in the constructor
-    function isConstructor() private view returns (bool) {
+    function isConstructor() public view returns (bool) {
         // extcodesize checks the size of the code stored in an address, and
         // address returns the current address. Since the code is still not
         // deployed when running a constructor, any checks on its code size will
@@ -903,23 +903,36 @@ contract InitializableToken is ERC20, InitializableERC20Detailed {
 
 contract CEO {
     address public OwnerAddress;
-    constructor () public{//建立合同需要运行的
+    /*address public WaitingAddress;
+    uint256 public CreateUpdataTime;*/
+    constructor () internal {//建立合同需要运行的
         OwnerAddress = msg.sender;
+        /*WaitingAddress = msg.sender;
+        CreateUpdataTime = 0;*/
         //谁建立谁就是管理员帐号
     }
-    modifier nolyCEO() {
-        require (isCEO(),"You are not the CEO");
-        _;
+    modifier onlyCEO() { 
+        require (isCEO(),"You are not the CEO"); 
+        _; 
     }
 
     function isCEO () public view returns (bool){
         return OwnerAddress ==  msg.sender;
     }
 
-    function updataCEO (address CEOAddress) public nolyCEO{ //修改CEO地址
+    function updateCEOApply (address CEOAddress) public onlyCEO{ //提交更新CEO
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
+        /*WaitingAddress = CEOAddress;
+        CreateUpdataTime = now;*/
         OwnerAddress = CEOAddress;
     }
+
+    /*function updataConfirm () public  {//等24小时后，
+        require( now > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
+        require (WaitingAddress == msg.sender,'You are not to update the address');
+        OwnerAddress = WaitingAddress;
+        CreateUpdataTime = 0;
+    }*/
 }
 
 interface IMintRewardLogic{
@@ -1058,10 +1071,10 @@ contract IMasset is MassetStructs {
         external returns (uint256 massetMinted);
 
     /** @dev Swapping */
-    function swap( address _input, address _output, uint256 _quantity, address _recipient)
+    /*function swap( address _input, address _output, uint256 _quantity, address _recipient)
         external returns (uint256 output);
     function getSwapOutput( address _input, address _output, uint256 _quantity)
-        external view returns (bool, string memory, uint256 output);
+        external view returns (bool, string memory, uint256 output);*/
 
     /** @dev Redeeming */
     function redeem(address _basset, uint256 _bassetQuantity)
@@ -1653,7 +1666,7 @@ contract ForgeValidator is IForgeValidator {
 }
 
 contract Masset is
-    Initializable,
+    /*Initializable,*/
     IMasset,
     InitializableToken,
     InitializableReentrancyGuard
@@ -1661,26 +1674,40 @@ contract Masset is
     using StableMath for uint256;
     using SafeERC20 for IERC20;
     
-    address public implementation;
+    
+    
     
     address public OwnerAddress;
-    /*constructor () public{//建立合同需要运行的
+    address public WaitingAddress;
+    uint256 public CreateUpdataTime;
+    /*constructor ()  {//建立合同需要运行的
         OwnerAddress = msg.sender;
-        //谁建立谁就是管理员帐号
+        WaitingAddress = msg.sender;
+        CreateUpdataTime = 0;
     }*/
-    modifier nolyCEO() {
-        require (isCEO(),"You are not the CEO");
-        _;
+    modifier onlyCEO() { 
+        require (isCEO(),"You are not the CEO"); 
+        _; 
     }
-
+    
     function isCEO () public view returns (bool){
         return OwnerAddress ==  msg.sender;
     }
 
-    function updataCEO (address CEOAddress) public nolyCEO{ //修改CEO地址
+    function updateCEOApply (address CEOAddress) public onlyCEO{ //提交更新CEO
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
-        OwnerAddress = CEOAddress;
+        WaitingAddress = CEOAddress;
+        CreateUpdataTime = block.timestamp;
     }
+
+    function updataConfirm () public  {//等24小时后，
+        require( block.timestamp > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
+        require (WaitingAddress == msg.sender,'You are not to update the address');
+        OwnerAddress = WaitingAddress;
+        CreateUpdataTime = 0;
+    }
+
+    address public implementation;
 
     //定义MintRewardLogic 地址
     IMintRewardLogic public interface_MintRewardLogic;
@@ -1696,8 +1723,57 @@ contract Masset is
     // State Events
     event SwapFeeChanged(uint256 fee);
     event RedemptionFeeChanged(uint256 fee);
+    event MAX_FEEChanged(uint256 fee);
     event ForgeValidatorChanged(address forgeValidator);
 
+
+    //Initializable
+    /**
+     * @dev Indicates that the contract has been initialized.
+     */
+    bool public initialized;
+
+    /**
+     * @dev Indicates that the contract is in the process of being initialized.
+     */
+    bool public initializing;
+
+    /**
+     * @dev Modifier to use in the initializer function of a contract.
+     */
+    modifier initializer() {
+        require(initializing || isConstructor() || !initialized, "Contract instance has already been initialized");
+
+        bool isTopLevelCall = !initializing;
+        if (isTopLevelCall) {
+            initializing = true;
+            initialized = true;
+        }
+
+        _;
+
+        if (isTopLevelCall) {
+            initializing = false;
+        }
+    }
+
+    /// @dev Returns true if and only if the function is running in the constructor
+    function isConstructor() public view returns (bool) {
+        // extcodesize checks the size of the code stored in an address, and
+        // address returns the current address. Since the code is still not
+        // deployed when running a constructor, any checks on its code size will
+        // yield zero, making it an effective way to detect if a contract is
+        // under construction or not.
+        address self = address(this);
+        uint256 cs;
+        assembly { cs := extcodesize(self) }
+        return cs == 0;
+    }
+
+    // Reserved storage space to allow for layout changes in the future.
+    uint256[50] private ______gap;
+
+    
     // Modules and connectors
     IForgeValidator public forgeValidator;
     bool private forgeValidatorLocked;
@@ -1725,8 +1801,12 @@ contract Masset is
         external
         initializer
     {
+        require(_forgeValidator!= address(0), "_forgeValidator is a zero value"); 
+        require(_basketManager != address(0), "_basketManager is a zero value"); 
+        require(_MintRewardLogic != address(0), "_MintRewardLogic is a zero value");
+
         InitializableToken._initialize(_nameArg, _symbolArg);
-        OwnerAddress = msg.sender;
+        OwnerAddress = CEOAddress;
         InitializableReentrancyGuard._initialize();
 
         forgeValidator = IForgeValidator(_forgeValidator);
@@ -1738,13 +1818,16 @@ contract Masset is
         MAX_FEE = 2e16;
         swapFee = 0;
         redemptionFee = 0;
+
+        WaitingAddress = CEOAddress;
+        CreateUpdataTime = 0;
     }
 
     //设置定义MintRewardLogic地址
-    /*function set_MintRewardLogic(address addr) public nolyCEO {
+    function set_MintRewardLogic(address addr) public onlyCEO {
         interface_MintRewardLogic = IMintRewardLogic(addr);
     }
-    */
+    
 
     /**
       * @dev Verifies that the caller is the Savings Manager contract
@@ -1960,7 +2043,7 @@ contract Masset is
      * @param _recipient    Address to credit output asset
      * @return output       Units of output asset returned
      */
-    function swap(
+    /*function swap(
         address _input,
         address _output,
         uint256 _quantity,
@@ -2009,7 +2092,7 @@ contract Masset is
         output = swapOutput;
 
         emit Swapped(msg.sender, _input, _output, swapOutput, _recipient);
-    }
+    }*/
 
     /**
      * @dev Determines both if a trade is valid, and the expected fee or output.
@@ -2021,7 +2104,7 @@ contract Masset is
      * @return reason       If swap is invalid, this is the reason
      * @return output       Units of _output asset the trade would return
      */
-    function getSwapOutput(
+    /*function getSwapOutput(
         address _input,
         address _output,
         uint256 _quantity
@@ -2068,7 +2151,7 @@ contract Masset is
             return (true, "", swapOutput);
         }
     }
-
+*/
 
     /***************************************
               REDEMPTION (PUBLIC)
@@ -2340,7 +2423,7 @@ contract Masset is
       */
     function upgradeForgeValidator(address _newForgeValidator)
         external
-        nolyCEO
+        onlyCEO
     {
         require(!forgeValidatorLocked, "Must be allowed to upgrade");
         require(_newForgeValidator != address(0), "Must be non null address");
@@ -2353,7 +2436,7 @@ contract Masset is
       */
     function lockForgeValidator()
         external
-        nolyCEO
+        onlyCEO
     {
         forgeValidatorLocked = true;
     }
@@ -2364,7 +2447,7 @@ contract Masset is
       */
     function setSwapFee(uint256 _swapFee)
         external
-        nolyCEO
+        onlyCEO
     {
         require(_swapFee <= MAX_FEE, "Rate must be within bounds");
         swapFee = _swapFee;
@@ -2378,7 +2461,7 @@ contract Masset is
       */
     function setRedemptionFee(uint256 _redemptionFee)
         external
-        nolyCEO
+        onlyCEO
     {
         require(_redemptionFee <= MAX_FEE, "Rate must be within bounds");
         redemptionFee = _redemptionFee;
@@ -2388,9 +2471,10 @@ contract Masset is
 
     function setMAX_FEE (uint256 MAX_FEE_) 
         external 
-        nolyCEO 
+        onlyCEO 
     {
         MAX_FEE = MAX_FEE_;
+        emit MAX_FEEChanged(MAX_FEE_);
     }
 
     /**
@@ -2428,8 +2512,7 @@ contract Masset is
         emit MintedMulti(address(this), address(this), interestCollected, new address[](0), gains);
 
         return (interestCollected, totalSupply());
-    }
-}
+    }}
 
 contract BasketManager is
     Initializable,
@@ -2448,11 +2531,43 @@ contract BasketManager is
     event BasketStatusChanged();
     event TransferFeeEnabled(address indexed bAsset, bool enabled);
 
-    address public implementation;
+
 
     address public OwnerAddress;
+    address public WaitingAddress;
+    uint256 public CreateUpdataTime;
+    /*constructor ()  {//建立合同需要运行的
+        OwnerAddress = msg.sender;
+        WaitingAddress = msg.sender;
+        CreateUpdataTime = 0;
+    }*/
+    modifier onlyCEO() { 
+        require (isCEO(),"You are not the CEO"); 
+        _; 
+    }
     
-    modifier nolyCEO() {
+    function isCEO () public view returns (bool){
+        return OwnerAddress ==  msg.sender;
+    }
+
+    function updateCEOApply (address CEOAddress) public onlyCEO{ //提交更新CEO
+        require(CEOAddress != address(0), "GOV: new CEO is address(0)");
+        WaitingAddress = CEOAddress;
+        CreateUpdataTime = block.timestamp;
+    }
+
+    function updataConfirm () public  {//等24小时后，
+        require( block.timestamp > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
+        require (WaitingAddress == msg.sender,'You are not to update the address');
+        OwnerAddress = WaitingAddress;
+        CreateUpdataTime = 0;
+    }
+
+    address public implementation;
+
+    /*address public OwnerAddress;
+    
+    modifier onlyCEO() {
         require (isCEO(),"You are not the CEO");
         _;
     }
@@ -2461,10 +2576,10 @@ contract BasketManager is
         return OwnerAddress ==  msg.sender;
     }
 
-    function updataCEO (address CEOAddress) public nolyCEO{ //修改CEO地址
+    function updataCEO (address CEOAddress) public onlyCEO{ //修改CEO地址
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
         OwnerAddress = CEOAddress;
-    }
+    }*/
 
     // mAsset linked to the manager (const)
     address public mAsset;
@@ -2496,11 +2611,12 @@ contract BasketManager is
     )
         external
         initializer
-    {
+    {   
         InitializableReentrancyGuard._initialize();
         OwnerAddress = CEOAddress;
         require(_mAsset != address(0), "mAsset address is zero");
         require(_bAssets.length > 0, "Must initialise with some bAssets");
+        require(CEOAddress!= address(0), "CEOAddress is a zero value");
         mAsset = _mAsset;
 
         // Defaults
@@ -2516,6 +2632,9 @@ contract BasketManager is
             );
         }
         _setBasketWeights(_bAssets, _weights, true);
+
+        WaitingAddress = CEOAddress;
+        CreateUpdataTime = 0;
     }
 
     /**
@@ -2686,7 +2805,7 @@ contract BasketManager is
      */
     function addBasset(address _bAsset, address _integration, bool _isTransferFeeCharged)
         external
-        nolyCEO
+        onlyCEO
         whenBasketIsHealthy
         whenNotRecolling
         returns (uint8 index)
@@ -2764,7 +2883,7 @@ contract BasketManager is
         uint256[] calldata _weights
     )
         external
-        nolyCEO
+        onlyCEO
         whenBasketIsHealthy
     {
         _setBasketWeights(_bAssets, _weights, false);
@@ -2836,7 +2955,7 @@ contract BasketManager is
      */
     function setTransferFeesFlag(address _bAsset, bool _flag)
         external
-        nolyCEO
+        onlyCEO
     {
         (bool exist, uint8 index) = _isAssetInBasket(_bAsset);
         require(exist, "bAsset does not exist");
@@ -2855,7 +2974,7 @@ contract BasketManager is
         public
         whenBasketIsHealthy
         whenNotRecolling
-        nolyCEO
+        onlyCEO
     {
         _removeBasset(_assetToRemove);
     }
@@ -3208,7 +3327,7 @@ contract BasketManager is
      */
     function handlePegLoss(address _bAsset, bool _belowPeg)
         external
-        nolyCEO
+        onlyCEO
         whenBasketIsHealthy
         returns (bool alreadyActioned)
     {
@@ -3235,7 +3354,7 @@ contract BasketManager is
      */
     function negateIsolation(address _bAsset)
         external
-        nolyCEO
+        onlyCEO
     {
         (bool exists, uint256 i) = _isAssetInBasket(_bAsset);
         require(exists, "bAsset must exist");
@@ -3255,7 +3374,7 @@ contract BasketManager is
      */
     function failBasset(address _bAsset)
         external
-        nolyCEO
+        onlyCEO
     {
         (bool exists, uint256 i) = _isAssetInBasket(_bAsset);
         require(exists, "bAsset must exist");
