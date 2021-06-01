@@ -793,54 +793,6 @@ library StableMath {
     }
 }
 
-contract Initializable {
-    //Initializable
-    /**
-     * @dev Indicates that the contract has been initialized.
-     */
-    bool public initialized;
-
-    /**
-     * @dev Indicates that the contract is in the process of being initialized.
-     */
-    bool public initializing;
-
-    /**
-     * @dev Modifier to use in the initializer function of a contract.
-     */
-    modifier initializer() {
-        require(initializing || isConstructor() || !initialized, "Contract instance has already been initialized");
-
-        bool isTopLevelCall = !initializing;
-        if (isTopLevelCall) {
-            initializing = true;
-            initialized = true;
-        }
-
-        _;
-
-        if (isTopLevelCall) {
-            initializing = false;
-        }
-    }
-
-    /// @dev Returns true if and only if the function is running in the constructor
-    function isConstructor() public view returns (bool) {
-        // extcodesize checks the size of the code stored in an address, and
-        // address returns the current address. Since the code is still not
-        // deployed when running a constructor, any checks on its code size will
-        // yield zero, making it an effective way to detect if a contract is
-        // under construction or not.
-        address self = address(this);
-        uint256 cs;
-        assembly { cs := extcodesize(self) }
-        return cs == 0;
-    }
-
-    // Reserved storage space to allow for layout changes in the future.
-    uint256[50] private ______gap;
-}
-
 contract InitializableERC20Detailed is IERC20 {
     string private _name;
     string private _symbol;
@@ -1773,7 +1725,7 @@ contract Masset is
     // Reserved storage space to allow for layout changes in the future.
     uint256[50] private ______gap;
 
-    
+
     // Modules and connectors
     IForgeValidator public forgeValidator;
     bool private forgeValidatorLocked;
@@ -2515,7 +2467,7 @@ contract Masset is
     }}
 
 contract BasketManager is
-    Initializable,
+    /*Initializable,*/
     MassetStructs,
     InitializableReentrancyGuard
 {
@@ -2530,6 +2482,53 @@ contract BasketManager is
     event BassetStatusChanged(address indexed bAsset, BassetStatus status);
     event BasketStatusChanged();
     event TransferFeeEnabled(address indexed bAsset, bool enabled);
+
+
+    //Initializable
+    /**
+     * @dev Indicates that the contract has been initialized.
+     */
+    bool public initialized;
+
+    /**
+     * @dev Indicates that the contract is in the process of being initialized.
+     */
+    bool public initializing;
+
+    /**
+     * @dev Modifier to use in the initializer function of a contract.
+     */
+    modifier initializer() {
+        require(initializing || isConstructor() || !initialized, "Contract instance has already been initialized");
+
+        bool isTopLevelCall = !initializing;
+        if (isTopLevelCall) {
+            initializing = true;
+            initialized = true;
+        }
+
+        _;
+
+        if (isTopLevelCall) {
+            initializing = false;
+        }
+    }
+
+    /// @dev Returns true if and only if the function is running in the constructor
+    function isConstructor() public view returns (bool) {
+        // extcodesize checks the size of the code stored in an address, and
+        // address returns the current address. Since the code is still not
+        // deployed when running a constructor, any checks on its code size will
+        // yield zero, making it an effective way to detect if a contract is
+        // under construction or not.
+        address self = address(this);
+        uint256 cs;
+        assembly { cs := extcodesize(self) }
+        return cs == 0;
+    }
+
+    // Reserved storage space to allow for layout changes in the future.
+    uint256[50] private ______gap;
 
 
 

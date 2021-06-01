@@ -453,6 +453,7 @@ contract mintRewardLogic  is CEO,Initializable{
         uint256 lastRewardInterval;
         uint256 nowdegree_;
         bool noNull;
+        bool noCut;
     }
 
     //用户信息 userInfo[addr]
@@ -655,8 +656,8 @@ contract mintRewardLogic  is CEO,Initializable{
     }
     
     //更新以挖总数量
-    function updateTotalAwards () public returns(uint256) {
-        if(lastMintBlockIntervalId != nowBlockId()){
+    function updateTotalAwards (bool addTotalAwardsType) public returns(uint256) {
+        if(lastMintBlockIntervalId != nowBlockId() && addTotalAwardsType){
             lastMintBlockIntervalId = nowBlockId();
             //累积当前每个块发放奖励
             totalAwards = totalAwards.add(sameCoinPerBlock[nowdegree()]);
@@ -669,15 +670,19 @@ contract mintRewardLogic  is CEO,Initializable{
 
     
     //个人结算 settle
-    function settle (address addr) public {
+    function settle (address addr,bool addTotalAwardsType) public {
         UserInfo storage user = userInfo[addr];
         uint256 pendingSameCoin_ = pendingSameCoin(addr);
-        //更新以挖总数量
-        uint256 oldTotalAwards = totalAwards;
+        //防止更新以挖总数量超过 initialSameCoin初始 先记录更改前的TotalAwards为oldTotalAwards，再更新updateTotalAwards
+        /*uint256 oldTotalAwards = totalAwards;
         if(oldTotalAwards>initialSameCoin){
             uint256 pendingSameCoin_ = initialSameCoin.sub(oldTotalAwards);
+        }*/
+        uint256 oldTotalAwards = totalAwards;
+        totalAwards = updateTotalAwards(addTotalAwardsType);
+        if(totalAwards>initialSameCoin){
+            pendingSameCoin_ = initialSameCoin.sub(oldTotalAwards);
         }
-        totalAwards = updateTotalAwards();
         user.pendingSameCoin = pendingSameCoin_;
         uint256 nowBlockId_ = nowBlockId();
         if(BlockIdDiff(addr)){
@@ -704,7 +709,7 @@ contract mintRewardLogic  is CEO,Initializable{
 
     //领奖
     function receivePrize (address addr) public {
-        settle(addr);
+        settle(addr,false);
         uint256 _unclaimedSameCoin = userInfo[addr].unclaimedSameCoin;
         uint256 _pendingSameCoin = pendingSameCoin(addr);
         uint256 _amount = _unclaimedSameCoin.add(_pendingSameCoin);
@@ -720,47 +725,32 @@ contract mintRewardLogic  is CEO,Initializable{
         uint256 nowBlockId_ = nowBlockId();
         mintBlockIdInfo[nowBlockId_].nowdegree_ = nowdegree();
         mintBlockIdInfo[nowBlockId_].noNull = true;
-        settle(addr);
+        mintBlockIdInfo[nowBlockId_].noCut = true;
+        //noCut
+        settle(addr,true);
         totalPerMintAmt[nowBlockId_][addr] = totalPerMintAmt[nowBlockId_][addr].add(amt);
         mintBlockIdInfo[nowBlockId_].totalMintAmt = mintBlockIdInfo[nowBlockId_].totalMintAmt.add(amt);
-        
     }
     
 
     //function兑换redeem时，进行减净值
     function sameUSDToRredeem (address addr,uint256 amt) public nolyLockingAddress{
-        settle(addr);
+        
         uint256 nowBlockId_ = nowBlockId();
         if(totalPerMintAmt[nowBlockId_][addr]<amt){
             amt = totalPerMintAmt[nowBlockId_][addr];
         }
-        /*if(mintBlockIdInfo[nowBlockId_].totalMintAmt<amt){
-            amt = mintBlockIdInfo[nowBlockId_].totalMintAmt;
-        }*/
         totalPerMintAmt[nowBlockId_][addr] = totalPerMintAmt[nowBlockId_][addr].sub(amt);
         mintBlockIdInfo[nowBlockId_].totalMintAmt = mintBlockIdInfo[nowBlockId_].totalMintAmt.sub(amt);
         //检查赎回后，是否还有人在挖，没人挖的话扣回累积挖矿数量
-        if(lastMintBlockIntervalId == nowBlockId_ && mintBlockIdInfo[nowBlockId_].totalMintAmt == 0 && mintBlockIdInfo[nowBlockId_].noNull){
+        if(lastMintBlockIntervalId == nowBlockId_ && mintBlockIdInfo[nowBlockId_].totalMintAmt == 0 && mintBlockIdInfo[nowBlockId_].noNull&& mintBlockIdInfo[nowBlockId_].noCut){
             uint256 nowdegree_ = mintBlockIdInfo[nowBlockId_].nowdegree_;
             totalAwards = totalAwards.sub(sameCoinPerBlock[nowdegree_]);
+            mintBlockIdInfo[nowBlockId_].noCut = false;
         }
-    }
-    //uint256 nowdegree_ = mintBlockIdInfo[nowBlockId_].nowdegree_;
+        settle(addr,false);
 
-    /*function sameUSDToRredeem (address addr,uint256 amt) public nolyLockingAddress{
-        settle(addr);
-        uint256 nowBlockId_ = nowBlockId();
-        if(totalPerMintAmt[nowBlockId_][addr]<amt){
-            amt = totalPerMintAmt[nowBlockId_][addr];
-        }
-        
-        totalPerMintAmt[nowBlockId_][addr] = totalPerMintAmt[nowBlockId_][addr].sub(amt);
-        mintBlockIdInfo[nowBlockId_].totalMintAmt = mintBlockIdInfo[nowBlockId_].totalMintAmt.sub(amt);
-        //检查赎回后，是否还有人在挖，没人挖的话扣回累积挖矿数量
-        if(lastMintBlockIntervalId == nowBlockId_ && mintBlockIdInfo[nowBlockId_].totalMintAmt == 0){
-            totalAwards = totalAwards.sub(sameCoinPerBlock[nowdegree()]);
-        }
-    }*/
+    }
 }
 
 
