@@ -389,7 +389,7 @@ contract Initializable {
     uint256[50] private ______gap;
 }
 
-contract CEO {
+  contract CEO {
     address public OwnerAddress;
     address public WaitingAddress;
     uint256 public CreateUpdataTime;
@@ -398,11 +398,14 @@ contract CEO {
         WaitingAddress = msg.sender;
         CreateUpdataTime = 0;
     }
+    event UpdateCEOApply(address CEOAddress,uint256 CreateUpdataTime);
+    event UpdataConfirm(address CEOAddress);
+    
     modifier onlyCEO() { 
         require (isCEO(),"You are not the CEO"); 
         _; 
     }
-
+    
     function isCEO () public view returns (bool){
         return OwnerAddress ==  msg.sender;
     }
@@ -410,14 +413,16 @@ contract CEO {
     function updateCEOApply (address CEOAddress) public onlyCEO{ //提交更新CEO
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
         WaitingAddress = CEOAddress;
-        CreateUpdataTime = now;
+        CreateUpdataTime = block.timestamp;
+        emit UpdateCEOApply(WaitingAddress,CreateUpdataTime);
     }
 
     function updataConfirm () public  {//等24小时后，
-        require( now > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
+        require( block.timestamp > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
         require (WaitingAddress == msg.sender,'You are not to update the address');
         OwnerAddress = WaitingAddress;
         CreateUpdataTime = 0;
+        emit UpdataConfirm(OwnerAddress);
     }
 }
 
@@ -483,7 +488,8 @@ contract saveRewardLogic  is CEO,Initializable{
     event Withdraw(address indexed user, uint256 amount);
     event UpdateScoinPerBlock_(address indexed user, uint256 amount);
     event Transfer(address indexed from, address indexed to, uint256 value);
-
+    event BonusPoolWithdrawApply(uint256 amount);
+    
 
     //创建时设置
     constructor () public {}
@@ -529,12 +535,13 @@ contract saveRewardLogic  is CEO,Initializable{
     //CEO往奖池提款申请
     function bonusPoolWithdrawApply () public onlyCEO  {
         CreateWithdrawTime = now;
+        emit BonusPoolWithdrawApply(CreateWithdrawTime);
     }
 
     //CEO往奖池提款申请确认
     function bonusPoolWithdrawConfirm (uint256 amt) public onlyCEO {
         
-        require( now > CreateWithdrawTime + (60*60) && CreateWithdrawTime!=0, "Time has not expired");//1小时
+        require( now > CreateWithdrawTime + (60*60*24) && CreateWithdrawTime!=0, "Time has not expired");//1小时
 
         CreateWithdrawTime = 0;
 
@@ -743,7 +750,7 @@ contract saveRewardLogic  is CEO,Initializable{
             user.amount = user.amount.add(_amount);
         }
         user.rewardDebt = user.amount.mul(accScoinPerShare).div(1e12);
-        temporaryDeduction += user.rewardDebt;
+        temporaryDeduction = temporaryDeduction.add(user.rewardDebt);
         updatePool();
         emit Deposit(msg.sender, _amount);
     }
@@ -759,6 +766,10 @@ contract saveRewardLogic  is CEO,Initializable{
         //总奖励 * (个人pl/总lp）
         uint256 pending = user.amount.mul(accScoinPerShare).div(1e12).sub(user.rewardDebt);
         if(pending > 0) {
+            uint256 sameCoinSupply = IERC20(SameCoinAddress).balanceOf(address(this));
+            if(pending > sameCoinSupply){
+                pending = sameCoinSupply;
+            }
             //去资金池发钱
             safeScoinTransfer(address(msg.sender), pending);
         }
@@ -767,7 +778,7 @@ contract saveRewardLogic  is CEO,Initializable{
             //从资金盘取出pltoken
             IERC20(LpTokenAddress).transfer(address(msg.sender),_amount);
         }
-        temporaryDeduction -= user.rewardDebt;
+        temporaryDeduction = temporaryDeduction.sub(user.rewardDebt);
         user.rewardDebt = user.amount.mul(accScoinPerShare).div(1e12);
         updatePool();
         emit Withdraw(msg.sender, _amount);
@@ -802,7 +813,7 @@ contract saveRewardLogic  is CEO,Initializable{
             safeScoinTransfer(address(msg.sender), pending);
         }
         updatePool();
-        temporaryDeduction -= user.rewardDebt;
+        temporaryDeduction = temporaryDeduction.sub(user.rewardDebt);
         user.rewardDebt = user.amount.mul(accScoinPerShare).div(1e12);
     }
 }

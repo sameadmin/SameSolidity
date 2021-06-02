@@ -69,6 +69,9 @@ contract Initializable {
         WaitingAddress = msg.sender;
         CreateUpdataTime = 0;
     }
+    event UpdateCEOApply(address CEOAddress,uint256 CreateUpdataTime);
+    event UpdataConfirm(address CEOAddress);
+    
     modifier onlyCEO() { 
         require (isCEO(),"You are not the CEO"); 
         _; 
@@ -82,6 +85,7 @@ contract Initializable {
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
         WaitingAddress = CEOAddress;
         CreateUpdataTime = block.timestamp;
+        emit UpdateCEOApply(WaitingAddress,CreateUpdataTime);
     }
 
     function updataConfirm () public  {//等24小时后，
@@ -89,6 +93,7 @@ contract Initializable {
         require (WaitingAddress == msg.sender,'You are not to update the address');
         OwnerAddress = WaitingAddress;
         CreateUpdataTime = 0;
+        emit UpdataConfirm(OwnerAddress);
     }
 }
 

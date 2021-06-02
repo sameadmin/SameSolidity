@@ -853,40 +853,6 @@ contract InitializableToken is ERC20, InitializableERC20Detailed {
     }
 }
 
-contract CEO {
-    address public OwnerAddress;
-    /*address public WaitingAddress;
-    uint256 public CreateUpdataTime;*/
-    constructor () internal {//建立合同需要运行的
-        OwnerAddress = msg.sender;
-        /*WaitingAddress = msg.sender;
-        CreateUpdataTime = 0;*/
-        //谁建立谁就是管理员帐号
-    }
-    modifier onlyCEO() { 
-        require (isCEO(),"You are not the CEO"); 
-        _; 
-    }
-
-    function isCEO () public view returns (bool){
-        return OwnerAddress ==  msg.sender;
-    }
-
-    function updateCEOApply (address CEOAddress) public onlyCEO{ //提交更新CEO
-        require(CEOAddress != address(0), "GOV: new CEO is address(0)");
-        /*WaitingAddress = CEOAddress;
-        CreateUpdataTime = now;*/
-        OwnerAddress = CEOAddress;
-    }
-
-    /*function updataConfirm () public  {//等24小时后，
-        require( now > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
-        require (WaitingAddress == msg.sender,'You are not to update the address');
-        OwnerAddress = WaitingAddress;
-        CreateUpdataTime = 0;
-    }*/
-}
-
 interface IMintRewardLogic{
     //function兑换mint时，进行加净值
     function sameUSDToMint(address addr,uint256 amt) external;
@@ -1650,6 +1616,7 @@ contract Masset is
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
         WaitingAddress = CEOAddress;
         CreateUpdataTime = block.timestamp;
+        emit UpdateCEOApply(WaitingAddress,CreateUpdataTime);
     }
 
     function updataConfirm () public  {//等24小时后，
@@ -1657,6 +1624,7 @@ contract Masset is
         require (WaitingAddress == msg.sender,'You are not to update the address');
         OwnerAddress = WaitingAddress;
         CreateUpdataTime = 0;
+        emit UpdataConfirm(OwnerAddress);
     }
 
     address public implementation;
@@ -1678,7 +1646,8 @@ contract Masset is
     event MAX_FEEChanged(uint256 fee);
     event ForgeValidatorChanged(address forgeValidator);
 
-
+    event UpdateCEOApply(address CEOAddress,uint256 CreateUpdataTime);
+    event UpdataConfirm(address CEOAddress);
     //Initializable
     /**
      * @dev Indicates that the contract has been initialized.
@@ -1875,7 +1844,7 @@ contract Masset is
         // Transfer collateral to the platform integration address and call deposit
         address integrator = bInfo.integrator;
         (uint256 quantityDeposited, uint256 ratioedDeposit) =
-            _depositTokens(_bAsset, bInfo.bAsset.ratio, integrator, bInfo.bAsset.isTransferFeeCharged, _bAssetQuantity);
+            _depositTokens(_bAsset, bInfo.bAsset.ratio, /*integrator*/address(this), bInfo.bAsset.isTransferFeeCharged, _bAssetQuantity);
 
         // Validation should be after token transfer, as bAssetQty is unknown before
         (bool mintValid, string memory reason) = forgeValidator.validateMint(totalSupply(), bInfo.bAsset, quantityDeposited);
@@ -1920,7 +1889,7 @@ contract Masset is
                 Basset memory bAsset = props.bAssets[i];
 
                 (uint256 quantityDeposited, uint256 ratioedDeposit) =
-                    _depositTokens(bAsset.addr, bAsset.ratio, props.integrators[i], bAsset.isTransferFeeCharged, bAssetQuantity);
+                    _depositTokens(bAsset.addr, bAsset.ratio, /*props.integrators[i]*/address(this), bAsset.isTransferFeeCharged, bAssetQuantity);
 
                 receivedQty[i] = quantityDeposited;
                 mAssetQuantity = mAssetQuantity.add(ratioedDeposit);
@@ -2483,6 +2452,8 @@ contract BasketManager is
     event BasketStatusChanged();
     event TransferFeeEnabled(address indexed bAsset, bool enabled);
 
+    event UpdateCEOApply(address CEOAddress,uint256 CreateUpdataTime);
+    event UpdataConfirm(address CEOAddress);
 
     //Initializable
     /**
@@ -2553,6 +2524,7 @@ contract BasketManager is
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
         WaitingAddress = CEOAddress;
         CreateUpdataTime = block.timestamp;
+        emit UpdateCEOApply(WaitingAddress,CreateUpdataTime);
     }
 
     function updataConfirm () public  {//等24小时后，
@@ -2560,6 +2532,7 @@ contract BasketManager is
         require (WaitingAddress == msg.sender,'You are not to update the address');
         OwnerAddress = WaitingAddress;
         CreateUpdataTime = 0;
+        emit UpdataConfirm(OwnerAddress);
     }
 
     address public implementation;

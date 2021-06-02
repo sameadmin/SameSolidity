@@ -389,7 +389,7 @@ contract Initializable {
     uint256[50] private ______gap;
 }
 
-contract CEO {
+  contract CEO {
     address public OwnerAddress;
     address public WaitingAddress;
     uint256 public CreateUpdataTime;
@@ -398,11 +398,14 @@ contract CEO {
         WaitingAddress = msg.sender;
         CreateUpdataTime = 0;
     }
+    event UpdateCEOApply(address CEOAddress,uint256 CreateUpdataTime);
+    event UpdataConfirm(address CEOAddress);
+    
     modifier onlyCEO() { 
         require (isCEO(),"You are not the CEO"); 
         _; 
     }
-
+    
     function isCEO () public view returns (bool){
         return OwnerAddress ==  msg.sender;
     }
@@ -410,14 +413,16 @@ contract CEO {
     function updateCEOApply (address CEOAddress) public onlyCEO{ //提交更新CEO
         require(CEOAddress != address(0), "GOV: new CEO is address(0)");
         WaitingAddress = CEOAddress;
-        CreateUpdataTime = now;
+        CreateUpdataTime = block.timestamp;
+        emit UpdateCEOApply(WaitingAddress,CreateUpdataTime);
     }
 
     function updataConfirm () public  {//等24小时后，
-        require( now > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
+        require( block.timestamp > CreateUpdataTime + (60*60*24) && CreateUpdataTime!=0, "Time has not expired");
         require (WaitingAddress == msg.sender,'You are not to update the address');
         OwnerAddress = WaitingAddress;
         CreateUpdataTime = 0;
+        emit UpdataConfirm(OwnerAddress);
     }
 }
 
@@ -487,7 +492,7 @@ contract mintRewardLogic  is CEO,Initializable{
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event show(uint256 val1,uint256 val2);
-    
+    event BonusPoolWithdrawApply(uint256 amount);
 
     //创建时设置
     constructor () public {}
@@ -567,12 +572,13 @@ contract mintRewardLogic  is CEO,Initializable{
     //CEO往奖池提款申请
     function bonusPoolWithdrawApply () public onlyCEO  {
         CreateWithdrawTime = now;
+        emit BonusPoolWithdrawApply(CreateWithdrawTime);
     }
 
     //CEO往奖池提款申请确认
     function bonusPoolWithdrawConfirm (uint256 amt) public onlyCEO {
         
-        require( now > CreateWithdrawTime + (60*60) && CreateWithdrawTime!=0, "Time has not expired");//1小时
+        require( now > CreateWithdrawTime + (60*60*24) && CreateWithdrawTime!=0, "Time has not expired");//1小时
 
         CreateWithdrawTime = 0;
 
@@ -723,10 +729,11 @@ contract mintRewardLogic  is CEO,Initializable{
     //function兑换mint时，进行加净值
     function sameUSDToMint(address addr,uint256 amt) public nolyLockingAddress{
         uint256 nowBlockId_ = nowBlockId();
-        mintBlockIdInfo[nowBlockId_].nowdegree_ = nowdegree();
+        if(!mintBlockIdInfo[nowBlockId_].noNull){
+            mintBlockIdInfo[nowBlockId_].nowdegree_ = nowdegree();
+        }
         mintBlockIdInfo[nowBlockId_].noNull = true;
         mintBlockIdInfo[nowBlockId_].noCut = true;
-        //noCut
         settle(addr,true);
         totalPerMintAmt[nowBlockId_][addr] = totalPerMintAmt[nowBlockId_][addr].add(amt);
         mintBlockIdInfo[nowBlockId_].totalMintAmt = mintBlockIdInfo[nowBlockId_].totalMintAmt.add(amt);
