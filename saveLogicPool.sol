@@ -284,7 +284,7 @@ library Address {
      * It is unsafe to assume that an address for which this function returns
      * false is an externally-owned account (EOA) and not a contract.
      *
-     * Among others, `isContract` will return false for the following 
+     * Among others, `isContract` will return false for the following
      * types of addresses:
      *
      *  - an externally-owned account
@@ -389,7 +389,7 @@ contract Initializable {
     uint256[50] private ______gap;
 }
 
-  contract CEO {
+contract CEO {
     address public OwnerAddress;
     address public WaitingAddress;
     uint256 public CreateUpdataTime;
@@ -400,12 +400,12 @@ contract Initializable {
     }
     event UpdateCEOApply(address CEOAddress,uint256 CreateUpdataTime);
     event UpdataConfirm(address CEOAddress);
-    
-    modifier onlyCEO() { 
-        require (isCEO(),"You are not the CEO"); 
-        _; 
+
+    modifier onlyCEO() {
+        require (isCEO(),"You are not the CEO");
+        _;
     }
-    
+
     function isCEO () public view returns (bool){
         return OwnerAddress ==  msg.sender;
     }
@@ -440,8 +440,8 @@ contract saveRewardLogic  is CEO,Initializable{
         uint256 amount;
 
         //偿还债务
-        uint256 rewardDebt; 
-        
+        uint256 rewardDebt;
+
     }
     uint256 public initialize_;
 
@@ -449,7 +449,7 @@ contract saveRewardLogic  is CEO,Initializable{
     mapping (address => UserInfo)public userInfo;
 
     //上一次发生分配的区块编号
-    uint256 public lastRewardBlock ;  
+    uint256 public lastRewardBlock ;
 
     //每股兑换价累积
     uint256 public accScoinPerShare = 0;
@@ -482,14 +482,14 @@ contract saveRewardLogic  is CEO,Initializable{
     //开始开采时的区块号
     uint256 public startBlock;
 
-    
+
 
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
     event UpdateScoinPerBlock_(address indexed user, uint256 amount);
     event Transfer(address indexed from, address indexed to, uint256 value);
     event BonusPoolWithdrawApply(uint256 amount);
-    
+
 
     //创建时设置
     constructor () public {}
@@ -505,7 +505,7 @@ contract saveRewardLogic  is CEO,Initializable{
         LpTokenAddress = lpTokenAddress_;
         SameCoinAddress = sameCoinAddress_;
     }
-    
+
 
     /**
     * 最高权限可设置 ⬇️
@@ -515,7 +515,7 @@ contract saveRewardLogic  is CEO,Initializable{
         require (i < degree.length , 'Is the index out of range' );
         degree[i] = val;
     }
-    
+
     //设置一个区块的奖励系数
     function updateBONUS_MULTIPLIER(uint256 i ,uint256 val)  public onlyCEO {
         require (i < BONUS_MULTIPLIER.length , 'Is the index out of range' );
@@ -540,7 +540,7 @@ contract saveRewardLogic  is CEO,Initializable{
 
     //CEO往奖池提款申请确认
     function bonusPoolWithdrawConfirm (uint256 amt) public onlyCEO {
-        
+
         require( now > CreateWithdrawTime + (60*60*24) && CreateWithdrawTime!=0, "Time has not expired");//1小时
 
         CreateWithdrawTime = 0;
@@ -554,7 +554,7 @@ contract saveRewardLogic  is CEO,Initializable{
         emit Transfer(address(this),address(msg.sender), amt);
 
     }
-    
+
 
 
 
@@ -566,7 +566,7 @@ contract saveRewardLogic  is CEO,Initializable{
         SameCoinAddress = addr;
     }*/
 
-    //设置 sameToken的每个用户的信息 
+    //设置 sameToken的每个用户的信息
     /*function updateUserInfo(address addr,uint256 amount,uint256 rewardDebt)  public onlyCEO{
         userInfo[addr] = UserInfo({
             amount : amount,
@@ -589,16 +589,16 @@ contract saveRewardLogic  is CEO,Initializable{
         scoinPerBlock = val;
         emit UpdateScoinPerBlock_(address(msg.sender), val);
     }
-    
-    
-    //查询难度系数 
+
+
+    //查询难度系数
     function nowdegree() public view returns(uint256){
-        uint256[] memory slowDownEndBlock;   
+        uint256[] memory slowDownEndBlock;
 
         uint256 degreeLength = degree.length;
 
-        slowDownEndBlock = new uint256[](degreeLength);        
-        
+        slowDownEndBlock = new uint256[](degreeLength);
+
         uint256 tolatDegree = 0;
         for(uint256 x = 0; x<degreeLength;x++){
             tolatDegree=tolatDegree.add(degree[x]);
@@ -611,7 +611,7 @@ contract saveRewardLogic  is CEO,Initializable{
         for(uint256 i = 0; i<degreeLength;i++){
             if(BONUS_MULTIPLIER[i]*scoinPerBlock>0){
                 endNumber = endNumber.add((initialSameCoin.mul(degree[i]).div(tolatDegree)).div(BONUS_MULTIPLIER[i].mul(scoinPerBlock)));
-            }         
+            }
             slowDownEndBlock[i] = startBlock+endNumber;
         }
 
@@ -624,7 +624,7 @@ contract saveRewardLogic  is CEO,Initializable{
         return slowDownEndBlock.length.sub(1);
     }
 
-    //查SameCoin剩余   
+    //查SameCoin剩余
     function getSameCoinBalanceOf(address addr) public view returns (uint256) {
         return IERC20(SameCoinAddress).balanceOf(addr);
     }
@@ -638,9 +638,9 @@ contract saveRewardLogic  is CEO,Initializable{
     function nowBlockNumber ()public view returns(uint256 val)  {
         return block.number;
     }
-    
-    
-    //向某地址发samecoin 
+
+
+    //向某地址发samecoin
     function safeScoinTransfer(address _to,uint256 _amount) internal {
         uint256 _SameCoin = getSameCoinBalanceOf(address(this));
         if (_amount > _SameCoin) {
@@ -665,12 +665,12 @@ contract saveRewardLogic  is CEO,Initializable{
     function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
         //to为当前区块号 _from为上一个区块号
         //结束区块号数组
-        uint256[] memory slowDownEndBlock;   
+        uint256[] memory slowDownEndBlock;
 
         uint256 degreeLength = degree.length;
 
-        slowDownEndBlock = new uint256[](degreeLength);        
-        
+        slowDownEndBlock = new uint256[](degreeLength);
+
         uint256 tolatDegree = 0;
         for(uint256 x = 0; x<degreeLength;x++){
             tolatDegree=tolatDegree.add(degree[x]);
@@ -686,7 +686,7 @@ contract saveRewardLogic  is CEO,Initializable{
                 endNumber += (initialSameCoin.mul(degree[i]).div(tolatDegree)).div(BONUS_MULTIPLIER[i].mul(scoinPerBlock));
             }else{
                 endNumber += 0;
-            }            
+            }
             slowDownEndBlock[i] = startBlock+endNumber;
         }
 
@@ -698,7 +698,7 @@ contract saveRewardLogic  is CEO,Initializable{
                 }else{
                     allMultiplier += slowDownEndBlock[a].sub(_from).mul(BONUS_MULTIPLIER[a]);
                     for(uint256 b = a+1; b<slowDownEndBlock.length;b++){
-                        
+
                         if(_to < slowDownEndBlock[b]){
                             allMultiplier += _to.sub(slowDownEndBlock[b.sub(1)]).mul(BONUS_MULTIPLIER[b]);
                             break;
@@ -706,7 +706,7 @@ contract saveRewardLogic  is CEO,Initializable{
                         allMultiplier += slowDownEndBlock[b].sub(slowDownEndBlock[b.sub(1)]).mul(BONUS_MULTIPLIER[b]);
                     }
                     break;
-                }        
+                }
             }
         }
         return allMultiplier;
@@ -733,7 +733,7 @@ contract saveRewardLogic  is CEO,Initializable{
         }
         //区块差
         uint256 multiplier = getMultiplier(lastRewardBlock, block.number);
-        //可发总奖励蛋糕 = 多少个区块待发奖 * 一个区块多少个蛋糕 
+        //可发总奖励蛋糕 = 多少个区块待发奖 * 一个区块多少个蛋糕
         uint256 scoinReward = multiplier.mul(scoinPerBlock);
         //池里面的每股lp累积蛋糕 = 池里面的每股累积蛋糕 + （可发总奖励蛋糕 * 1000000000000 / 这个合约里的对应币的lp余额）
         accScoinPerShare = accScoinPerShare.add(scoinReward.mul(1e12).div(lpSupply));
@@ -810,7 +810,7 @@ contract saveRewardLogic  is CEO,Initializable{
         }
         return user.amount.mul(accScoinPerShare_).div(1e12).sub(user.rewardDebt);
     }
-    
+
     //只提取全部收益
     function claimAllRewards () public {
         UserInfo storage user = userInfo[msg.sender];
