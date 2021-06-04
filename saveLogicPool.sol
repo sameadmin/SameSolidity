@@ -477,7 +477,7 @@ contract saveRewardLogic  is CEO,Initializable{
 
     uint256 public CreateWithdrawTime = 0;
 
-    uint256 public temporaryDeduction = 0;
+    //uint256 public temporaryDeduction = 0;
 
     //开始开采时的区块号
     uint256 public startBlock;
@@ -500,7 +500,7 @@ contract saveRewardLogic  is CEO,Initializable{
         degree = [50,30,20,0,0,0];
         BONUS_MULTIPLIER = [3000000000000000000,1600000000000000000,1200000000000000000,0,0,0];
         CreateWithdrawTime = 0;
-        temporaryDeduction = 0;
+        //temporaryDeduction = 0;
         startBlock = 0;
         LpTokenAddress = lpTokenAddress_;
         SameCoinAddress = sameCoinAddress_;
@@ -593,27 +593,35 @@ contract saveRewardLogic  is CEO,Initializable{
     
     //查询难度系数 
     function nowdegree() public view returns(uint256){
-        uint256 sameCoinSupply = IERC20(SameCoinAddress).balanceOf(address(this));
-        uint256 lpSupply = IERC20(LpTokenAddress).balanceOf(address(this));
-        uint256 awardProportion =  ((initialSameCoin.sub(sameCoinSupply).add((lpSupply.mul(accScoinPerShare).div(1e12)).sub(temporaryDeduction))).mul(1e27)).div(initialSameCoin);
+        uint256[] memory slowDownEndBlock;   
+
         uint256 degreeLength = degree.length;
+
+        slowDownEndBlock = new uint256[](degreeLength);        
+        
         uint256 tolatDegree = 0;
         for(uint256 x = 0; x<degreeLength;x++){
             tolatDegree=tolatDegree.add(degree[x]);
         }
-        uint256 a = 0;
-        uint256 ratio = 0;
-        if(degreeLength==0){
-            return 0;
-        }
+        //uint256 allMultiplier = 0;
+        uint256 endNumber = 0;
+        //uint256 ratio = 0;
+
+
         for(uint256 i = 0; i<degreeLength;i++){
-            a=a.add(degree[i]);
-            ratio = a.mul(1e27).div(tolatDegree);
-            if(awardProportion < ratio){
-                return i;
+            if(BONUS_MULTIPLIER[i]*scoinPerBlock>0){
+                endNumber = endNumber.add((initialSameCoin.mul(degree[i]).div(tolatDegree)).div(BONUS_MULTIPLIER[i].mul(scoinPerBlock)));
+            }         
+            slowDownEndBlock[i] = startBlock+endNumber;
+        }
+
+        for(uint256 j =0;j<slowDownEndBlock.length;j++){
+            if(block.number < slowDownEndBlock[j]){
+                return j;
             }
         }
-        return degreeLength.sub(1);
+
+        return slowDownEndBlock.length.sub(1);
     }
 
     //查SameCoin剩余   
@@ -669,7 +677,7 @@ contract saveRewardLogic  is CEO,Initializable{
         }
         uint256 allMultiplier = 0;
         uint256 endNumber = 0;
-        uint256 ratio = 0;
+        //uint256 ratio = 0;
 
 
         for(uint256 i = 0; i<degreeLength;i++){
@@ -750,7 +758,7 @@ contract saveRewardLogic  is CEO,Initializable{
             user.amount = user.amount.add(_amount);
         }
         user.rewardDebt = user.amount.mul(accScoinPerShare).div(1e12);
-        temporaryDeduction = temporaryDeduction.add(user.rewardDebt);
+        //temporaryDeduction = temporaryDeduction.add(user.rewardDebt);
         updatePool();
         emit Deposit(msg.sender, _amount);
     }
@@ -778,7 +786,7 @@ contract saveRewardLogic  is CEO,Initializable{
             //从资金盘取出pltoken
             IERC20(LpTokenAddress).transfer(address(msg.sender),_amount);
         }
-        temporaryDeduction = temporaryDeduction.sub(user.rewardDebt);
+        //temporaryDeduction = temporaryDeduction.sub(user.rewardDebt);
         user.rewardDebt = user.amount.mul(accScoinPerShare).div(1e12);
         updatePool();
         emit Withdraw(msg.sender, _amount);
@@ -813,7 +821,7 @@ contract saveRewardLogic  is CEO,Initializable{
             safeScoinTransfer(address(msg.sender), pending);
         }
         updatePool();
-        temporaryDeduction = temporaryDeduction.sub(user.rewardDebt);
+        //temporaryDeduction = temporaryDeduction.sub(user.rewardDebt);
         user.rewardDebt = user.amount.mul(accScoinPerShare).div(1e12);
     }
 }
